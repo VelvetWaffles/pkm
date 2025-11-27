@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Egg Hatching Idle Demo</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --accent: #8b5cf6;
+      --accent-2: #22d3ee;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --positive: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(34,211,238,0.1), transparent 30%),
+                  radial-gradient(circle at 80% 0%, rgba(139,92,246,0.1), transparent 25%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h2, h3 { margin: 0; }
+
+    .top-bar {
+      background: linear-gradient(90deg, rgba(34,211,238,0.15), rgba(139,92,246,0.2));
+      padding: 12px 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    .top-item {
+      background: rgba(255,255,255,0.04);
+      padding: 8px 12px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: box-shadow 0.3s ease, transform 0.2s ease;
+    }
+
+    .top-item.glow { box-shadow: 0 0 12px rgba(34,211,238,0.6); transform: translateY(-2px); }
+
+    .status { color: var(--muted); font-weight: 600; }
+    .status.warning { color: var(--warning); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr 360px;
+      gap: 16px;
+      padding: 16px;
+      flex: 1;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .panel h3 { margin-bottom: 8px; letter-spacing: 0.5px; }
+
+    .egg-slot, .location-card, .pokemon-card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .egg-slot.locked { opacity: 0.5; }
+    .egg-slot .progress {
+      height: 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .egg-slot .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.4s ease; }
+
+    button {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      color: #0b1021;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.25); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
+
+    .pokemon-card {
+      display: grid;
+      grid-template-columns: 80px 1fr 120px;
+      gap: 10px;
+      align-items: center;
+      min-height: 100px;
+    }
+    .pokemon-card .avatar {
+      width: 70px; height: 70px; border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--muted);
+      background: radial-gradient(circle, rgba(255,255,255,0.05), transparent 60%);
+      position: relative;
+    }
+    .pokemon-card .info small { color: var(--muted); }
+
+    .badge { padding: 2px 6px; border-radius: 6px; font-size: 11px; }
+    .rarity-common { background: #4b5563; color: #fff; }
+    .rarity-uncommon { background: #22c55e; color: #0b1021; }
+    .rarity-rare { background: #38bdf8; color: #0b1021; }
+    .rarity-epic { background: #a855f7; color: #0b1021; }
+    .rarity-legendary { background: #fbbf24; color: #0b1021; }
+
+    .assignments { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    .location-card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .location-list { display: flex; gap: 8px; flex-wrap: wrap; }
+    .location-chip { background: rgba(255,255,255,0.08); padding: 6px 8px; border-radius: 8px; font-size: 12px; }
+
+    .stamina { height: 8px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; margin-top: 4px; }
+    .stamina span { display: block; height: 100%; background: linear-gradient(90deg, #22c55e, #a3e635); transition: width 0.3s ease; }
+
+    .emoji-bubble {
+      position: absolute;
+      top: -6px; right: -6px;
+      background: rgba(0,0,0,0.7);
+      padding: 4px 6px;
+      border-radius: 12px;
+      font-size: 16px;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      pointer-events: none;
+    }
+    .emoji-bubble.show { opacity: 1; transform: translateY(-20px); }
+
+    .warning-text { color: var(--warning); font-weight: 700; }
+
+    .particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+    .particle { position: absolute; color: #fff; opacity: 0; animation: float 1s ease-out forwards; font-weight: 700; }
+    @keyframes float { from { transform: translateY(0) scale(0.8); opacity: 1; } to { transform: translateY(-30px) scale(1.2); opacity: 0; } }
+
+    .egg-glow { box-shadow: 0 0 16px rgba(250, 204, 21, 0.7); }
+
+    .muted { color: var(--muted); }
+
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .pokemon-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="top-item" id="moneyDisplay">💰 Money: <strong id="moneyValue">0</strong></div>
+    <div class="top-item" id="berryDisplay">🍓 Berries: <strong id="berryValue">0</strong></div>
+    <div class="top-item">Required/ Tick: <strong id="berryNeed">0</strong></div>
+    <div class="status" id="statusText">Working normally</div>
+  </div>
+
+  <div class="layout">
+    <section class="panel" id="eggPanel">
+      <h3>Egg Incubator</h3>
+      <div id="eggSlots"></div>
+    </section>
+
+    <section class="panel" id="pokemonPanel">
+      <h3>Pokémon Collection</h3>
+      <div id="pokemonList"></div>
+    </section>
+
+    <section class="panel" id="locationsPanel">
+      <h3>Work Locations</h3>
+      <div id="locationCards"></div>
+    </section>
+  </div>
+
+  <div class="particles" id="particles"></div>
+
+  <script>
+    // ----- Species definitions -----
+    const speciesPool = [
+      { name: 'Flameling', rarity: 'common', basePower: 5, hatchTimeMultiplier: 1, berryNeedMultiplier: 1, preferredLocation: 'powerPlant', workMultipliers: { daycare: 1, forest: 0.9, powerPlant: 1.2 }, spriteKey: 'flame-orb', voiceKey: 'flame-cry' },
+      { name: 'Leaflet', rarity: 'common', basePower: 4, hatchTimeMultiplier: 0.9, berryNeedMultiplier: 0.9, preferredLocation: 'forest', workMultipliers: { daycare: 1, forest: 1.2, powerPlant: 0.8 }, spriteKey: 'leaf-orb', voiceKey: 'leaf-cry' },
+      { name: 'Aquapup', rarity: 'uncommon', basePower: 7, hatchTimeMultiplier: 1.1, berryNeedMultiplier: 1.1, preferredLocation: 'daycare', workMultipliers: { daycare: 1.3, forest: 1, powerPlant: 1 }, spriteKey: 'aqua-orb', voiceKey: 'aqua-cry' },
+      { name: 'Sparkwatt', rarity: 'uncommon', basePower: 8, hatchTimeMultiplier: 1.2, berryNeedMultiplier: 1.2, preferredLocation: 'powerPlant', workMultipliers: { daycare: 0.9, forest: 0.9, powerPlant: 1.4 }, spriteKey: 'spark-orb', voiceKey: 'spark-cry' },
+      { name: 'Mossaur', rarity: 'rare', basePower: 12, hatchTimeMultiplier: 1.5, berryNeedMultiplier: 1.4, preferredLocation: 'forest', workMultipliers: { daycare: 1, forest: 1.4, powerPlant: 0.9 }, spriteKey: 'moss-orb', voiceKey: 'moss-cry' },
+      { name: 'Cryosting', rarity: 'rare', basePower: 11, hatchTimeMultiplier: 1.4, berryNeedMultiplier: 1.3, preferredLocation: 'daycare', workMultipliers: { daycare: 1.3, forest: 1, powerPlant: 1 }, spriteKey: 'cryo-orb', voiceKey: 'cryo-cry' },
+      { name: 'Terradrum', rarity: 'epic', basePower: 16, hatchTimeMultiplier: 1.8, berryNeedMultiplier: 1.7, preferredLocation: 'forest', workMultipliers: { daycare: 0.9, forest: 1.6, powerPlant: 1 }, spriteKey: 'terra-orb', voiceKey: 'terra-cry' },
+      { name: 'Voltazor', rarity: 'epic', basePower: 18, hatchTimeMultiplier: 2, berryNeedMultiplier: 1.9, preferredLocation: 'powerPlant', workMultipliers: { daycare: 0.8, forest: 0.9, powerPlant: 1.8 }, spriteKey: 'volt-orb', voiceKey: 'volt-cry' },
+      { name: 'Zephyro', rarity: 'legendary', basePower: 24, hatchTimeMultiplier: 2.6, berryNeedMultiplier: 2.4, preferredLocation: 'daycare', workMultipliers: { daycare: 1.8, forest: 1, powerPlant: 1 }, spriteKey: 'wind-orb', voiceKey: 'wind-cry' },
+      { name: 'Lumifawn', rarity: 'legendary', basePower: 22, hatchTimeMultiplier: 2.4, berryNeedMultiplier: 2.2, preferredLocation: 'forest', workMultipliers: { daycare: 1.2, forest: 1.9, powerPlant: 1 }, spriteKey: 'lumi-orb', voiceKey: 'lumi-cry' },
+      { name: 'Stonepup', rarity: 'common', basePower: 6, hatchTimeMultiplier: 1, berryNeedMultiplier: 1, preferredLocation: 'daycare', workMultipliers: { daycare: 1.2, forest: 0.9, powerPlant: 0.9 }, spriteKey: 'stone-orb', voiceKey: 'stone-cry' },
+    ];
+
+    // Weights for rarity selection
+    const rarityWeights = { common: 40, uncommon: 25, rare: 18, epic: 12, legendary: 5 };
+
+    // ----- Game state -----
+    const gameState = {
+      money: 120,
+      berries: 80,
+      eggs: [
+        { unlocked: true, egg: null },
+        { unlocked: false, egg: null },
+        { unlocked: false, egg: null },
+      ],
+      eggSlotCosts: [0, 150, 300],
+      eggPrice: 40,
+      pokemon: [],
+      locations: {
+        daycare: { id: 'daycare', name: 'Daycare', unlockedSlots: 2, maxSlots: 6, baseUnlockCost: 120, assigned: [] },
+        forest: { id: 'forest', name: 'Nameless Forest', unlockedSlots: 2, maxSlots: 6, baseUnlockCost: 120, assigned: [] },
+        powerPlant: { id: 'powerPlant', name: 'Power Plant', unlockedSlots: 2, maxSlots: 6, baseUnlockCost: 120, assigned: [] },
+      },
+      staminaDrain: 2,
+      staminaRecover: 1,
+      berryWarning: false,
+    };
+
+    // Utility helpers
+    function format(num) { return Math.floor(num).toLocaleString(); }
+
+    function pickSpecies() {
+      const totalWeight = speciesPool.reduce((sum, s) => sum + rarityWeights[s.rarity], 0);
+      const r = Math.random() * totalWeight;
+      let acc = 0;
+      for (const s of speciesPool) {
+        acc += rarityWeights[s.rarity];
+        if (r <= acc) return structuredClone(s);
+      }
+      return structuredClone(speciesPool[0]);
+    }
+
+    function createEgg() {
+      const species = pickSpecies();
+      const baseTime = 25; // seconds base
+      const time = baseTime * species.hatchTimeMultiplier;
+      return { species, remaining: time, total: time, ready: false };
+    }
+
+    function berryNeedForPokemon(poke) {
+      return poke.basePower * poke.berryNeedMultiplier;
+    }
+
+    function effectivePower(poke, locationId) {
+      return poke.basePower * (poke.workMultipliers[locationId] || 1);
+    }
+
+    // ----- Core actions -----
+    function buyEgg(slotIndex) {
+      const slot = gameState.eggs[slotIndex];
+      if (!slot.unlocked || slot.egg || gameState.money < gameState.eggPrice) return;
+      gameState.money -= gameState.eggPrice;
+      slot.egg = createEgg();
+      flashParticle('#eggPanel', '+Egg');
+      updateUI();
+    }
+
+    function unlockEggSlot(index) {
+      const cost = gameState.eggSlotCosts[index];
+      if (gameState.money < cost) return;
+      gameState.money -= cost;
+      gameState.eggs[index].unlocked = true;
+      updateUI();
+    }
+
+    function unlockLocationSlot(id) {
+      const loc = gameState.locations[id];
+      if (loc.unlockedSlots >= loc.maxSlots) return;
+      const cost = loc.baseUnlockCost * (1 + (loc.unlockedSlots - 2));
+      if (gameState.money < cost) return;
+      gameState.money -= cost;
+      loc.unlockedSlots += 1;
+      updateUI();
+    }
+
+    function hatchEgg(index) {
+      const slot = gameState.eggs[index];
+      if (!slot.egg || !slot.egg.ready) return;
+      const species = slot.egg.species;
+      const newPoke = {
+        id: crypto.randomUUID(),
+        ...species,
+        currentStamina: 100,
+        maxStamina: 100,
+        assigned: null,
+      };
+      gameState.pokemon.push(newPoke);
+      slot.egg = null;
+      flashParticle('#pokemonPanel', `${species.name}!`);
+      const slotElement = document.querySelector(`[data-egg-index="${index}"]`);
+      slotElement?.classList.add('egg-glow');
+      setTimeout(() => slotElement?.classList.remove('egg-glow'), 600);
+      updateUI();
+    }
+
+    function assignPokemon(id, locationId) {
+      const poke = gameState.pokemon.find(p => p.id === id);
+      const loc = gameState.locations[locationId];
+      if (!poke || !loc) return;
+      if (loc.assigned.length >= loc.unlockedSlots) return;
+      // Remove from previous
+      if (poke.assigned) {
+        const prev = gameState.locations[poke.assigned];
+        prev.assigned = prev.assigned.filter(pid => pid !== id);
+      }
+      poke.assigned = locationId;
+      loc.assigned.push(id);
+      showEmojiBubble(id, poke.preferredLocation === locationId ? '❤️' : '💔');
+      updateUI();
+    }
+
+    function unassignPokemon(id) {
+      const poke = gameState.pokemon.find(p => p.id === id);
+      if (!poke || !poke.assigned) return;
+      const loc = gameState.locations[poke.assigned];
+      loc.assigned = loc.assigned.filter(pid => pid !== id);
+      poke.assigned = null;
+      updateUI();
+    }
+
+    function playVoice(id) {
+      const poke = gameState.pokemon.find(p => p.id === id);
+      if (!poke) return;
+      alert(`${poke.name} makes a cry! (voice key: ${poke.voiceKey})`);
+    }
+
+    // ----- UI rendering -----
+    function renderEggSlots() {
+      const container = document.getElementById('eggSlots');
+      container.innerHTML = '';
+      gameState.eggs.forEach((slot, i) => {
+        const card = document.createElement('div');
+        card.className = 'egg-slot';
+        card.dataset.eggIndex = i;
+        if (!slot.unlocked) card.classList.add('locked');
+        if (!slot.unlocked) {
+          card.innerHTML = `<div class="muted">Slot locked</div><button ${gameState.money < gameState.eggSlotCosts[i] ? 'disabled' : ''}>Unlock for ${gameState.eggSlotCosts[i]}</button>`;
+          card.querySelector('button').onclick = () => unlockEggSlot(i);
+          container.appendChild(card);
+          return;
+        }
+        if (!slot.egg) {
+          card.innerHTML = `<div>Empty slot</div><button ${gameState.money < gameState.eggPrice ? 'disabled' : ''}>Buy Egg (${gameState.eggPrice})</button>`;
+          card.querySelector('button').onclick = () => buyEgg(i);
+        } else {
+          const egg = slot.egg;
+          const progress = 100 - (egg.remaining / egg.total * 100);
+          card.innerHTML = `
+            <div><strong>Egg (${egg.species.rarity})</strong> - ${egg.species.name}</div>
+            <div class="progress"><span style="width:${progress}%"></span></div>
+            <div>${egg.ready ? 'Ready to hatch!' : `Time left: ${egg.remaining.toFixed(1)}s`}</div>
+            ${egg.ready ? `<button>Hatch</button>` : ''}
+          `;
+          if (egg.ready) card.querySelector('button').onclick = () => hatchEgg(i);
+        }
+        container.appendChild(card);
+      });
+    }
+
+    function renderPokemonList() {
+      const list = document.getElementById('pokemonList');
+      list.innerHTML = '';
+      if (!gameState.pokemon.length) {
+        list.innerHTML = '<div class="muted">No Pokémon yet. Hatch some eggs!</div>';
+        return;
+      }
+      gameState.pokemon.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'pokemon-card';
+        card.onclick = () => showEmojiBubble(p.id, randomEmoji());
+        card.innerHTML = `
+          <div class="avatar">Art\nPlaceholder<div class="emoji-bubble" id="bubble-${p.id}"></div></div>
+          <div class="info">
+            <div><strong>${p.name}</strong> <span class="badge rarity-${p.rarity}">${p.rarity}</span></div>
+            <small>Power ${p.basePower} • Berry need ${berryNeedForPokemon(p).toFixed(1)}/tick • Preferred: ${p.preferredLocation}</small>
+            <div>Location: <strong>${p.assigned ? locationName(p.assigned) : 'Idle'}</strong></div>
+            <div>Stamina: ${p.currentStamina.toFixed(0)}/${p.maxStamina}</div>
+            <div class="stamina"><span style="width:${(p.currentStamina/p.maxStamina*100)}%"></span></div>
+          </div>
+          <div class="controls">
+            <div class="assignments">
+              <button ${isAssignedTo(p, 'daycare')} onclick="assignPokemon('${p.id}','daycare')">Daycare</button>
+              <button ${isAssignedTo(p, 'forest')} onclick="assignPokemon('${p.id}','forest')">Forest</button>
+              <button ${isAssignedTo(p, 'powerPlant')} onclick="assignPokemon('${p.id}','powerPlant')">Power</button>
+              <button ${!p.assigned ? 'disabled' : ''} onclick="unassignPokemon('${p.id}')">Rest</button>
+            </div>
+            <button style="margin-top:6px; width:100%;" onclick="playVoice('${p.id}'); event.stopPropagation();">Play Voice (${p.voiceKey})</button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function isAssignedTo(p, loc) { return p.assigned === loc ? 'disabled' : ''; }
+    function locationName(id) { return gameState.locations[id]?.name || 'Unknown'; }
+
+    function renderLocations() {
+      const container = document.getElementById('locationCards');
+      container.innerHTML = '';
+      Object.values(gameState.locations).forEach(loc => {
+        const card = document.createElement('div');
+        card.className = 'location-card';
+        const cost = loc.baseUnlockCost * (1 + (loc.unlockedSlots - 2));
+        const assigned = loc.assigned.map(id => gameState.pokemon.find(p => p.id === id)).filter(Boolean);
+        const totalEff = assigned.reduce((sum, p) => sum + effectivePower(p, loc.id), 0);
+        card.innerHTML = `
+          <header>
+            <div><strong>${loc.name}</strong> <small class="muted">Slots: ${loc.assigned.length}/${loc.unlockedSlots}/${loc.maxSlots}</small></div>
+            <button ${loc.unlockedSlots >= loc.maxSlots || gameState.money < cost ? 'disabled' : ''}>Unlock (+1) ${cost}</button>
+          </header>
+          <div class="muted">Total effective power: ${totalEff.toFixed(1)}</div>
+          <div class="location-list">
+            ${assigned.map(p => `<div class="location-chip">${p.name} (${effectivePower(p, loc.id).toFixed(1)})</div>`).join('') || '<div class="muted">No one assigned</div>'}
+          </div>
+        `;
+        card.querySelector('button').onclick = () => unlockLocationSlot(loc.id);
+        container.appendChild(card);
+      });
+    }
+
+    function updateTopBar(requiredBerries) {
+      const moneyEl = document.getElementById('moneyDisplay');
+      const berryEl = document.getElementById('berryDisplay');
+      document.getElementById('moneyValue').textContent = format(gameState.money);
+      document.getElementById('berryValue').textContent = format(gameState.berries);
+      document.getElementById('berryNeed').textContent = requiredBerries.toFixed(1);
+      const status = document.getElementById('statusText');
+      status.textContent = gameState.berryWarning ? 'Not enough berries, all work efficiency = 0' : 'Working normally';
+      status.classList.toggle('warning', gameState.berryWarning);
+      if (!gameState.berryWarning) status.classList.remove('warning');
+    }
+
+    function showEmojiBubble(pokeId, emoji) {
+      const bubble = document.getElementById(`bubble-${pokeId}`);
+      if (!bubble) return;
+      bubble.textContent = emoji;
+      bubble.classList.add('show');
+      setTimeout(() => bubble.classList.remove('show'), 800);
+    }
+
+    function randomEmoji() {
+      const list = ['😀','😆','😴','🤩','🥱','😮','😸'];
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function flashParticle(targetSelector, text) {
+      const host = document.querySelector(targetSelector) || document.body;
+      const rect = host.getBoundingClientRect();
+      const particle = document.createElement('div');
+      particle.className = 'particle';
+      particle.textContent = text;
+      particle.style.left = `${rect.left + Math.random() * rect.width}px`;
+      particle.style.top = `${rect.top + Math.random() * rect.height}px`;
+      document.getElementById('particles').appendChild(particle);
+
+      // Brief glow for currency changes
+      if (host.classList.contains('top-item')) {
+        host.classList.add('glow');
+        setTimeout(() => host.classList.remove('glow'), 400);
+      }
+      setTimeout(() => particle.remove(), 1000);
+    }
+
+    // ----- Game Loop -----
+    function tick() {
+      // Update eggs
+      const daycarePower = gameState.locations.daycare.assigned
+        .map(id => gameState.pokemon.find(p => p.id === id)).filter(Boolean)
+        .reduce((sum, p) => sum + (p.currentStamina > 0 ? effectivePower(p, 'daycare') : 0), 0);
+
+      gameState.eggs.forEach(slot => {
+        if (!slot.egg || slot.egg.ready) return;
+        let reduction = 1 + daycarePower * 0.05;
+        slot.egg.remaining -= reduction;
+        if (slot.egg.remaining <= 0) { slot.egg.remaining = 0; slot.egg.ready = true; }
+      });
+
+      // Stamina handling and berry requirement
+      let requiredBerries = 0;
+      gameState.pokemon.forEach(p => {
+        const workNeed = berryNeedForPokemon(p);
+        const isWorking = Boolean(p.assigned);
+        requiredBerries += isWorking ? workNeed : workNeed / 5;
+        if (isWorking) {
+          p.currentStamina = Math.max(0, p.currentStamina - gameState.staminaDrain);
+          if (p.currentStamina === 0) showEmojiBubble(p.id, '😔');
+        } else {
+          p.currentStamina = Math.min(p.maxStamina, p.currentStamina + gameState.staminaRecover);
+        }
+      });
+
+      // Berry consumption & warning
+      gameState.berryWarning = gameState.berries < requiredBerries;
+      const consumed = Math.min(gameState.berries, requiredBerries);
+      gameState.berries = Math.max(0, gameState.berries - consumed);
+
+      // Production
+      if (!gameState.berryWarning) {
+        // Forest -> berries
+        const forestGain = gameState.locations.forest.assigned
+          .map(id => gameState.pokemon.find(p => p.id === id)).filter(Boolean)
+          .reduce((sum, p) => sum + (p.currentStamina > 0 ? effectivePower(p, 'forest') : 0), 0);
+        gameState.berries += forestGain;
+        if (forestGain > 0) flashParticle('#berryDisplay', `+${forestGain.toFixed(0)}`);
+
+        // Power Plant -> money
+        const moneyGain = gameState.locations.powerPlant.assigned
+          .map(id => gameState.pokemon.find(p => p.id === id)).filter(Boolean)
+          .reduce((sum, p) => sum + (p.currentStamina > 0 ? effectivePower(p, 'powerPlant') : 0), 0);
+        gameState.money += moneyGain;
+        if (moneyGain > 0) flashParticle('#moneyDisplay', `+${moneyGain.toFixed(0)}`);
+      }
+
+      updateUI(requiredBerries);
+    }
+
+    function updateUI(requiredBerries = 0) {
+      renderEggSlots();
+      renderPokemonList();
+      renderLocations();
+      updateTopBar(requiredBerries);
+    }
+
+    // Initialize
+    updateUI();
+    setInterval(tick, 1000);
+  </script>
+</body>
+</html>
